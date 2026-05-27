@@ -1,5 +1,5 @@
 from game import Game
-from frames import Welcome, Settings, GameOver, Connection
+from frames import Welcome, Settings, GameOver
 from config import Config
 from client import Client
 import pygame
@@ -32,11 +32,17 @@ screen = pygame.display.set_mode(screen_size)
 
 client = Client(config)
 
+# we try to connect to the server
+client_key = client.connect()
+# if the client is not already connected we stop the program
+if client_key is None:
+    running = False
+    pygame.quit()
+
 welcome = Welcome(screen, config, client)
 game = Game(screen, config)
 settings = Settings(screen, config)
 game_over = GameOver(screen, config)
-connection = Connection(screen, config, client)
 
 active_frame = welcome
 next_frame = None
@@ -45,8 +51,7 @@ frames = {
     "game": game,
     "welcome": welcome,
     "settings": settings,
-    "game_over": game_over,
-    "connection": connection
+    "game_over": game_over
 }
 
 while running:
@@ -61,12 +66,12 @@ while running:
 
         if next_frame == game_over and active_frame == game:
             # sends a request to the server saying that the game is over
-            client.send_request("over")
+            client.send_request("OVER")
 
             game_over.score = game.score
             game.reset()
 
-        if next_frame == game and active_frame == connection:
+        if next_frame == game and active_frame == welcome:
 
             game.start_game(client)
 
@@ -83,6 +88,8 @@ while running:
         if event.type == pygame.QUIT:
             # saving all the data
             config.save_file()
+            # sending a request to the server saying that we want to close the conn
+            client.send_request("CLOSE")
             pygame.quit()
             running = False
 

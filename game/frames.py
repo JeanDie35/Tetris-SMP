@@ -44,8 +44,8 @@ class Welcome(Frame):
         self.client = client
 
         # creating grid var for the buttons' rect because it'll be needed when cheking if the mouse is on the button
-        self.conn_rect = assets["play"].get_rect()
-        self.conn_rect.x, self.conn_rect.y = (self.screen.get_width() // 2 - assets["play"].get_width() // 2,
+        self.play_rect = assets["play"].get_rect()
+        self.play_rect.x, self.play_rect.y = (self.screen.get_width() // 2 - assets["play"].get_width() // 2,
                                               3 * self.screen.get_height() // 4 - assets["play"].get_width() // 4)
 
         self.settings_rect = assets["settings"].get_rect()
@@ -55,21 +55,24 @@ class Welcome(Frame):
         self.screen.blit(assets["logo"], (self.screen.get_width() // 2 - assets["logo"].get_width() // 2,
                                                self.screen.get_height() // 4 - assets["logo"].get_width() // 4))
 
-        self.screen.blit(assets["connection"], self.conn_rect)
+        self.screen.blit(assets["play"], self.play_rect)
 
         self.screen.blit(assets["settings"], self.settings_rect)
+
+        # when the client has reveived the message from the server that the game is starting, we start the game
+        if self.client.game_started:
+            self.client.game_started = False
+            return "game"
 
     def handle_events(self, event: pygame.event.Event) -> str | None:
         if event.type == pygame.MOUSEBUTTONDOWN:
 
-            if self.conn_rect.collidepoint(event.pos):
-                client_key = self.client.connect()
-                # if the client is not already connected we change the frame
-                if client_key is not None:
-                    return "connection"
-
-            elif self.settings_rect.collidepoint(event.pos):
+            if self.settings_rect.collidepoint(event.pos):
                 return "settings"
+
+            elif self.play_rect.collidepoint(event.pos):
+                # if the user tries to start the game, we don't change the active frame, but we send a request to the server
+                self.client.send_request("START")
 
         return None
 
@@ -168,51 +171,10 @@ class GameOver(Frame):
     def handle_events(self, event: pygame.event.Event) -> str | None:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.back_rect.collidepoint(event.pos):
-                return "connection"
-
-        return None
-
-
-class Connection(Frame):
-
-    def __init__(self, screen: pygame.surface.Surface, config, client):
-        super().__init__(screen, config)
-
-        self.client = client
-
-        self.play_rect = assets["play"].get_rect()
-        self.play_rect.x, self.play_rect.y = (self.screen.get_width() // 2 - assets["play"].get_width() // 2,
-                                              3 * self.screen.get_height() // 4 - assets["play"].get_width() // 4)
-
-        self.back_rect = assets["back"].get_rect()
-        self.back_rect.x, self.back_rect.y = (0 + self.back_rect.width // 2,
-                                              self.screen.get_height() - self.back_rect.height - 20)
-
-    def update(self):
-
-        self.screen.blit(assets["play"], self.play_rect)
-
-        self.screen.blit(assets["back"], self.back_rect)
-
-        self.screen.blit(assets["logo"], (self.screen.get_width() // 2 - assets["logo"].get_width() // 2,
-                                          self.screen.get_height() // 4 - assets["logo"].get_width() // 4))
-
-        # when the client has reveived the message from the server that the game is starting, we start the game
-        if self.client.in_game:
-            return "game"
-
-    def handle_events(self, event: pygame.event.Event) -> str | None:
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.back_rect.collidepoint(event.pos):
-                # we close the socket
-                self.client.send_request('close')
                 return "welcome"
 
-            if self.play_rect.collidepoint(event.pos):
-                # if the user tries to start the game, we don't change the active frame, but we send a request to the server
-                self.client.send_request("start")
-
         return None
+
 
 class KeySelector:
 

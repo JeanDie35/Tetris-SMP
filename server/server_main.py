@@ -32,19 +32,18 @@ class Server:
 
     def close_conn_with(self, client_key: str):
         print(f"Closing connection with client : {client_key}")
-        self.clients[client_key]["socket"].send(encode("closed"))
+        self.clients[client_key]["socket"].send(encode("CLOSED"))
 
     def start_game(self):
         for client in self.clients:
             # checks if the client is online and not already playing
             if self.clients[client]["online"]:
-                self.clients[client]["socket"].send(encode("start"))
+                self.clients[client]["socket"].send(encode("START"))
                 self.clients[client]["in_game"] = True
         self.in_game = True
 
     def end_game(self, client_key: str):
         self.clients[client_key]["in_game"] = False
-        self.close_conn_with(client_key)
 
         for client in self.clients:
             if self.clients[client]["in_game"]:
@@ -76,7 +75,7 @@ class Server:
                 raise Exception("Game is already started")
 
         except Exception as e:
-            client_socket.send(encode(e.args))
+            client_socket.send(encode(e.args[0]))
             return None
 
         else:
@@ -92,18 +91,18 @@ class Server:
             try:
                 while True:
                     # receive and print client messages
-                    request = decode(client_socket.recv(1024))
+                    request = decode(client_socket.recv(1024)).upper()
 
-                    if request == "close":
+                    if request == "CLOSE":
                         self.close_conn_with(key)
 
-                    elif request == "start":
+                    elif request == "START":
                         self.start_game()
 
-                    elif request == "next":
+                    elif request == "NEXT_BLOCK":
                         self.next_block(key)
 
-                    elif request == "over":
+                    elif request == "OVER":
                         self.end_game(key)
 
                     else:
