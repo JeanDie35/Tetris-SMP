@@ -49,16 +49,15 @@ class Client:
 
     def get_response(self):
         while True:
-            self.response = None
-            # waits for the server to start
+
             self.response = decode(self.socket.recv(1024)).upper()
             print(f"Received : {self.response}")
 
-            if self.response == "START":
+            if self.response.find("GAME_STARTED") != -1:
                 # will tell the game to start
                 self.game_started = True
 
-            elif self.response == "CLOSED":
+            elif self.response.find("CLOSED") != -1:
                 self.close_conn()
                 break
 
@@ -69,10 +68,10 @@ class Client:
 
     def get_color(self):
         self.send_request("NEXT_BLOCK")
-        print("Waiting for the color ...")
         # waiting for the server to answer
-        while self.response is None:
+        while self.response.find("NEXT_BLOCK") == -1:
             pass
+        self.response = self.response.split(":")[1]
         return self.response
 
     def close_conn(self):

@@ -153,6 +153,7 @@ class GameOver(Frame):
 
     def update(self):
         self.best_score = max(self.best_score, self.score)
+        self.config.data["best_score"] = self.best_score
 
         best_score_text = self.font.render(f"Best score : {self.best_score}", 1, self.config.data["colors"]["white"])
         self.screen.blit(best_score_text, (self.screen.get_width() // 2 - best_score_text.get_width() // 2,

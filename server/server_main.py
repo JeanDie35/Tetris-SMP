@@ -38,7 +38,7 @@ class Server:
         for client in self.clients:
             # checks if the client is online and not already playing
             if self.clients[client]["online"]:
-                self.clients[client]["socket"].send(encode("START"))
+                self.clients[client]["socket"].send(encode("GAME_STARTED"))
                 self.clients[client]["in_game"] = True
         self.in_game = True
 
@@ -95,6 +95,7 @@ class Server:
 
                     if request == "CLOSE":
                         self.close_conn_with(key)
+                        break
 
                     elif request == "START":
                         self.start_game()
@@ -108,7 +109,7 @@ class Server:
                     else:
                         response = "accepted"
 
-                        client_socket.send(encode(response))
+                        client_socket.send(encode(f"{request}:{response}"))
 
                     print(f"Received: {request}")
 
@@ -159,7 +160,8 @@ class Server:
             self.blocks.append(self.get_random_number())
 
         # sends the new number to the client
-        self.clients[key]["socket"].send(encode(self.blocks[self.clients[key]["block"]]))
+        block = self.blocks[self.clients[key]["block"]]
+        self.clients[key]["socket"].send(encode(f"NEXT_BLOCK:{block}"))
 
 
 server = Server()
