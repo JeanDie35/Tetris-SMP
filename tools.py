@@ -8,6 +8,7 @@ def decode(msg: bytes):
     print("msg : ", msg)
     msg2 = msg.decode("utf-8")
     print("decoded : ", msg2)
+    print(type(msg2))
     msg2 = json.loads(msg2)
     print("loaded : ", msg2)
     print(type(msg2))
@@ -41,10 +42,4 @@ def decode(msg: bytes):
 """""
 
 
-arr = np.zeros((5, 5))
-msg = arr.tolist()
-msg = json.dumps(msg)
-msg = json.loads(msg)
-msg = np.ndarray(msg)
-print(msg)
 

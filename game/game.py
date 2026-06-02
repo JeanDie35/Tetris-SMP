@@ -402,7 +402,7 @@ class Game:
         while self.client.response["name"] != "GRID":
             pass
         # updates the opponen'ts grid after transforming the response into a list
-        self.update_opponent_grid(np.ndarray(self.client.response["args"]))
+        self.update_opponent_grid(np.array(self.client.response["args"]))
 
         while self.client.response["name"] != "SCORE":
             pass
