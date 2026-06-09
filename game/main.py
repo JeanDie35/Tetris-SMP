@@ -27,7 +27,7 @@ Careful:
 running = True
 
 pygame.display.set_caption(config.data["title"])
-screen_size = (config.data["screen_width"], config.data["screen_height"])
+screen_size = (config.data["game_screen_width"], config.data["game_screen_height"])
 screen = pygame.display.set_mode(screen_size)
 
 client = Client(config)

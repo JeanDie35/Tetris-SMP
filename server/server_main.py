@@ -141,20 +141,16 @@ class Server:
 
                     # if the user wants to transfer data to the other players
                     elif request["type"] == "TRANSFER":
-
-                        if request["name"] == "GRID":
-                            # we transfer directly the grid to the opponent
-                            self.send_grid(key)
-
-                        elif request["name"] == "SCORE":
-                            # we transfer directly the score to the opponent
-                            self.send_score(key)
+                            self.send_data(key, request["name"], request["args"])
 
                     # when the user sends a request and waits for a value
                     elif request["type"] == "GET":
 
                         if request["name"] == "NEXT_BLOCK":
                             self.next_block(key)
+
+                        elif request["name"] == "NB_PLAYERS":
+                            self.send_response(key, {"name": "NB_PLAYERS", "args": self.nb_online_players})
 
 
             finally:
@@ -204,34 +200,20 @@ class Server:
         block = self.blocks[self.clients[key]["block"]]
         self.send_response(key, {"name": "NEXT_BLOCK", "args": block})
 
-    def send_grid(self, key):
+    def send_data(self, key, data_name, data):
+
+        # get the opponent's key
+        opponent = None
+        for client in self.clients:
+           if client != key:
+               opponent = client
+
         # we don't send the grid if there's more than 2 players online or less because we can't display three grids
         if self.nb_online_players == 2:
-            # get the opponent's key
-            opponent = None
-            for client in self.clients:
-                if client != key:
-                    opponent = client
-
             # send the opponent's grid
-            self.send_response(key, {"name": "GRID", "args": self.clients[opponent]["grid"]})
+            self.send_response(opponent, {"name": data_name.upper(), "args": data})
 
-        else:
-            self.send_response(key, {"name": "GRID", "args": None})
 
-    def send_score(self, key):
-        # we don't send the score if there's more than 2 players online or less because we can't display three grids
-        if self.nb_online_players == 2:
-            # get the opponent's key
-            opponent = None
-            for client in self.clients:
-                if client != key:
-                    opponent = client
-            # send the opponent's score
-            self.send_response(key, {"name": "SCORE", "args": self.clients[opponent]["score"]})
-
-        else:
-            self.send_response(key, {"name": "SCORE", "args": None})
 
 
 server = Server()

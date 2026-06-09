@@ -2,6 +2,8 @@ import numpy as np
 import pygame
 import time
 
+from config import Config
+
 pygame.init()
 
 BLOCK_SIZE = 25
@@ -130,11 +132,86 @@ class ActivePiece:
         return fit
 
 
-class Game:
+class GameUI:
 
-    def __init__(self, screen: pygame.surface.Surface, config):
+    def __init__(self, screen: pygame.surface.Surface, config: Config, title, origin_x):
         self.screen = screen
         self.config = config
+
+        self.title = title
+        self.font = pygame.font.SysFont(self.config.data["font_name"], self.config.data["font_size"])
+        self.playing_screen_size = (self.config.data["playing_screen_width"], self.config.data["playing_screen_height"])
+
+        # abscissa of the top right corner of the UI, we don't put the 
+        self.origin_x = origin_x
+
+    def is_fixed_block(self, coords: list | tuple, grid) -> bool:
+        return self.config.data["first_fixed_block"] <= grid[coords] <= self.config.data["last_fixed_block"]
+
+    def render(self, grid, score, next_color, active_color=None):
+
+        self.display_grid(grid, active_color)
+        self.display_title()
+        self.display_next_block_text()
+        self.display_next_block(next_color)
+        self.display_score(score)
+
+        # draw the blue line
+        pygame.draw.rect(self.screen, self.config.data["colors"]["blue"],
+                         ((self.playing_screen_size[0] + self.origin_x, 0), (10, self.screen.get_height())))
+
+        pygame.draw.rect(self.screen, self.config.data["colors"]["blue"],
+                         ((self.config.data["game_screen_width"] + self.origin_x - 10, 0), (10, self.screen.get_height())))
+
+    def display_grid(self, grid, active_color):
+        # updating the blocks
+        non_zero = np.argwhere(grid != 0)
+
+        for y, x in non_zero:
+
+            if self.is_fixed_block((y, x), grid):
+                self.screen.blit(blocks[int(grid[y, x])]["image"],
+                                 (x * BLOCK_SIZE + self.origin_x, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
+
+            elif active_color != None:
+                self.screen.blit(blocks[active_color]["image"],
+                                 (x * BLOCK_SIZE + self.origin_x, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
+
+    def display_title(self):
+        title_text = self.font.render(self.title, 1, self.config.data["colors"]["white"])
+        self.screen.blit(title_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"] + self.origin_x, 10))
+
+    def display_next_block_text(self):
+        blocks_text = self.font.render("Next block:", 1, self.config.data["colors"]["white"])
+        self.screen.blit(blocks_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"] + self.origin_x, 40))
+
+    def display_next_block(self, color):
+        next_array = blocks[color]["arrays"][0]
+
+        for y in range(next_array.shape[0]):
+
+            for x in range(next_array.shape[1]):
+
+                if next_array[y, x] == self.config.data["moving_block"]:
+                    self.screen.blit(blocks[color]["image"], (
+                        self.playing_screen_size[0] + self.config.data["sidebar_offset"] + x * BLOCK_SIZE + self.origin_x,
+                        100 + y * BLOCK_SIZE,
+                        BLOCK_SIZE, BLOCK_SIZE))
+
+    def display_score(self, score):
+
+        score_text = self.font.render(f"Score : {score}", 1, self.config.data["colors"]["white"])
+        self.screen.blit(score_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"] + self.origin_x, 200))
+
+
+
+class Game:
+
+    def __init__(self, screen: pygame.surface.Surface, config: Config):
+        self.screen = screen
+        self.config = config
+
+        self.game_ui = {"my_game":GameUI(self.screen, self.config, "Your game", 0)}
 
         # server part
         self.client = None
@@ -151,10 +228,12 @@ class Game:
 
         self.over = False
 
-        self.font = pygame.font.SysFont(self.config.data["font_name"], self.config.data["font_size"])
         self.counter = 0
 
         self.key_binds = self.config.data["key_binds"]
+
+    def set_screen_size(self, size):
+        self.screen = pygame.display.set_mode(size)
 
     def start_game(self, client):
         # when starting the game, we need a client to communicate with the server
@@ -163,8 +242,15 @@ class Game:
         self.active_piece = ActivePiece(self, self.config, self.client.get_color())
         self.insert_blocks()
 
-
         self.next_color = int(self.client.get_color())
+
+        self.nb_players = int(self.client.get_nb_players())
+        # if there's only 2 players playing
+        if self.nb_players == 2:
+            # we add another UI
+            self.game_ui["opponent_game"] = GameUI(self.screen, self.config, "Opponent's game", self.config.data["game_screen_width"])
+            # resize the screen
+            self.set_screen_size((self.config.data["game_screen_width"] * 2, self.config.data["game_screen_height"]))
 
     def insert_blocks(self):
         """""
@@ -196,6 +282,8 @@ class Game:
         self.active_piece = ActivePiece(self, self.config, self.client.get_color())
         self.insert_blocks()
 
+        self.set_screen_size((self.config.data["game_screen_width"], self.config.data["game_screen_height"]))
+
     def move_line_down(self, y: int):
         """""
         moves all row above y by one
@@ -210,6 +298,9 @@ class Game:
     def handle_events(self, event):
 
         if event.type == pygame.KEYDOWN:
+
+            if event.key == pygame.K_F6:
+                self.move_line_down(self.grid.shape[0] - 1)
 
             if event.key == self.key_binds["turn right"] or event.key == self.key_binds["turn left"]:
 
@@ -267,84 +358,6 @@ class Game:
             if event.key == self.key_binds["speed up"]:
                 self.active_piece.speed = self.base_speed
 
-# updates the render
-
-# updates the opponent's data
-
-    def update_opponent_grid(self, grid):
-        for y in range(grid.shape[0]):
-
-            for x in range(grid.shape[1]):
-
-                if grid[y, x] in range(self.config.data["first_fixed_block"], self.config.data["last_fixed_block"] + 1):
-                    self.screen.blit(pygame.transform.scale(blocks[grid[y, x]]["image"], (BLOCK_SIZE // 3, BLOCK_SIZE // 3)), (
-                        self.playing_screen_size[0] + self.config.data["sidebar_offset"] + x * BLOCK_SIZE // 3,
-                        180 + y * BLOCK_SIZE // 3))
-
-    def update_opponent_score(self, score):
-        opponent_text = self.font.render("Opponent's", 1, self.config.data["colors"]["white"])
-        self.screen.blit(opponent_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"], 400))
-
-        score_text = self.font.render(f"score : {score}", 1, self.config.data["colors"]["white"])
-        self.screen.blit(score_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"], 440))
-    # updates the user's data
-
-    def update_next_block(self):
-        next_array = blocks[self.next_color]["arrays"][0]
-
-        for y in range(next_array.shape[0]):
-
-            for x in range(next_array.shape[1]):
-
-                if next_array[y, x] == self.config.data["moving_block"]:
-                    self.screen.blit(blocks[self.next_color]["image"], (
-                        self.playing_screen_size[0] + self.config.data["sidebar_offset"] + x * BLOCK_SIZE,
-                        70 + y * BLOCK_SIZE,
-                        BLOCK_SIZE, BLOCK_SIZE))
-
-    def update_score(self):
-        score_text = self.font.render(f"Score : {self.score}", 1, self.config.data["colors"]["white"])
-        self.screen.blit(score_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"], 170))
-
-    def update_texts(self):
-        blocks_text = self.font.render("Next block:", 1, self.config.data["colors"]["white"])
-        self.screen.blit(blocks_text, (self.playing_screen_size[0] + self.config.data["sidebar_offset"], 10))
-
-    def render(self):
-        """""
-        update the displays on the right side of the screen
-        """""
-        pygame.draw.rect(self.screen, self.config.data["colors"]["black"], (
-            (self.playing_screen_size[0] + self.config.data["sidebar_offset"], 0),
-            (self.screen.get_width() - self.playing_screen_size[0], self.screen.get_height())))
-
-        self.update_score()
-        self.update_texts()
-        self.update_next_block()
-
-        # we also update the opp
-        self.get_update_opponent_data()
-
-        # creating the right part of the screen
-        pygame.draw.rect(self.screen, self.config.data["colors"]["blue"],
-                         ((self.playing_screen_size[0], 0), (10, self.screen.get_height())))
-
-
-    def update_blocks(self):
-        # updating the blocks
-        self.screen.fill(self.config.data["bg_color"])
-        non_zero = np.argwhere(self.grid != 0)
-
-        for y, x in non_zero:
-
-            if self.is_fixed_block((y, x)):
-                self.screen.blit(blocks[int(self.grid[y, x])]["image"],
-                                 (x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
-
-            else:
-                self.screen.blit(blocks[self.active_piece.color_value]["image"],
-                                 (x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
-
     def check_lines(self):
         # number of lines broken at the same time
         lines_in_a_row = 0
@@ -400,23 +413,30 @@ class Game:
         grid = self.grid.astype(int).tolist()
         self.client.send_request({"type": "TRANSFER", "name": "GRID", "args": grid})
         self.client.send_request({"type": "TRANSFER", "name": "SCORE", "args": self.score})
+        self.client.send_request({"type": "TRANSFER", "name": "NEXT_COLOR", "args": self.next_color})
 
-    def get_update_opponent_data(self):
-        print(self.client.responses)
-        print('GRID' in self.client.responses)
-        # updates the opponen'ts grid after transforming the response into a list
+    def render(self):
+        # we fill the entire screen with black so we can recreate the whole ui
+        self.screen.fill(self.config.data["bg_color"])
+
+        self.game_ui["my_game"].render(self.grid, self.score, self.next_color,
+                                       active_color=self.active_piece.color_value)
+
+        # when we have all the informations about the opponent we can display its data
         if 'GRID' in self.client.responses and self.client.responses['GRID'] is not None:
             grid = np.array(self.client.responses["GRID"])
-            self.update_opponent_grid(grid)
 
-        if 'SCORE' in self.client.responses and self.client.responses['SCORE'] is not None:
-            self.update_opponent_score(self.client.responses["SCORE"])
+            if 'SCORE' in self.client.responses and self.client.responses['SCORE'] is not None:
+                score = self.client.responses["SCORE"]
 
+                if 'NEXT_COLOR' in self.client.responses and self.client.responses['NEXT_COLOR'] is not None:
+                    next_color = self.client.responses["NEXT_COLOR"]
+
+                    print(self.client.responses)
+                    self.game_ui["opponent_game"].render(grid, score, next_color)
 
 
     def update(self):
-
-        self.update_blocks()
 
         self.check_lines()
 

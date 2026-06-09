@@ -5,8 +5,8 @@
         0
     ],
     "title": "Tetris",
-    "screen_width": 500,
-    "screen_height": 600,
+    "game_screen_width": 500,
+    "game_screen_height": 600,
     "playing_screen_width": 300,
     "playing_screen_height": 600,
     "font_name": "Comic sans MS",

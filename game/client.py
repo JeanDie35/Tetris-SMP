@@ -101,6 +101,14 @@ class Client:
             pass
         return self.responses["NEXT_BLOCK"]
 
+    def get_nb_players(self):
+        # sends a request for the next block
+        self.send_request({"type": "GET", "name": "NB_PLAYERS", "args": None})
+        # waits for the server to answer
+        while not "NB_PLAYERS" in self.responses or self.responses["NB_PLAYERS"] is None:
+            pass
+        return self.responses["NB_PLAYERS"]
+
     def close_conn(self):
         # close client socket (connection to the server)
         self.socket.close()
