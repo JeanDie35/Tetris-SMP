@@ -25,11 +25,11 @@
     "first_accepted_letter": 97,
     "last_accepted_letter": 122,
     "key_binds": {
-        "right": 1073741903,
-        "left": 1073741904,
-        "speed up": 1073741905,
-        "turn right": 122,
-        "turn left": 97
+        "right": 100,
+        "left": 113,
+        "speed up": 115,
+        "turn right": 1073741903,
+        "turn left": 1073741904
     },
     "colors": {
         "black": [

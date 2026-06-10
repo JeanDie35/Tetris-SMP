@@ -47,6 +47,10 @@ class Client:
 
                 return self.key
 
+        # when the server isn't online
+        except OSError:
+            print("Connection failed, the server is shutdown")
+
         except Exception as e:
             print(f"Error: {e}")
             return None

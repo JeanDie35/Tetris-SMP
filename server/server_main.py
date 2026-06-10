@@ -49,6 +49,8 @@ class Server:
         return key
 
     def close_conn_with(self, client_key: str):
+        self.end_game(client_key)
+
         print(f"Closing connection with client : {client_key}")
         self.send_response(client_key, {"name": "CLOSED", "args": None})
 
@@ -205,13 +207,12 @@ class Server:
         # get the opponent's key
         opponent = None
         for client in self.clients:
-           if client != key:
+            if client != key:
                opponent = client
 
-        # we don't send the grid if there's more than 2 players online or less because we can't display three grids
-        if self.nb_online_players == 2:
-            # send the opponent's grid
-            self.send_response(opponent, {"name": data_name.upper(), "args": data})
+
+        # send the opponent's grid
+        self.send_response(opponent, {"name": data_name.upper(), "args": data})
 
 
 

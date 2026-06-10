@@ -211,7 +211,7 @@ class Game:
         self.screen = screen
         self.config = config
 
-        self.game_ui = {"my_game":GameUI(self.screen, self.config, "Your game", 0)}
+        self.game_ui = {"you":GameUI(self.screen, self.config, "Your game", 0)}
 
         # server part
         self.client = None
@@ -245,10 +245,11 @@ class Game:
         self.next_color = int(self.client.get_color())
 
         self.nb_players = int(self.client.get_nb_players())
+
         # if there's only 2 players playing
         if self.nb_players == 2:
             # we add another UI
-            self.game_ui["opponent_game"] = GameUI(self.screen, self.config, "Opponent's game", self.config.data["game_screen_width"])
+            self.game_ui["opponent"] = GameUI(self.screen, self.config, "Opponent's game", self.config.data["game_screen_width"])
             # resize the screen
             self.set_screen_size((self.config.data["game_screen_width"] * 2, self.config.data["game_screen_height"]))
 
@@ -282,6 +283,7 @@ class Game:
         self.active_piece = ActivePiece(self, self.config, self.client.get_color())
         self.insert_blocks()
 
+        # reset the screen's size
         self.set_screen_size((self.config.data["game_screen_width"], self.config.data["game_screen_height"]))
 
     def move_line_down(self, y: int):
@@ -392,6 +394,8 @@ class Game:
                 if not self.over:
                     self.score += self.config.data["score_per_block"]
 
+            print("grid : ", self.grid)
+
         self.counter += 1
 
     def spawn_new_blocks(self):
@@ -409,17 +413,24 @@ class Game:
         """""
         sends the grid and the score to the server
         """""
-        # transform the grid into a list of int
-        grid = self.grid.astype(int).tolist()
-        self.client.send_request({"type": "TRANSFER", "name": "GRID", "args": grid})
-        self.client.send_request({"type": "TRANSFER", "name": "SCORE", "args": self.score})
-        self.client.send_request({"type": "TRANSFER", "name": "NEXT_COLOR", "args": self.next_color})
+        # we don't send the grid if there's more than 2 players online or less because we can't display three grids
+        if self.nb_players == 2:
+            grid = self.grid.copy()
+            # we transform the 1 with the active color so that the other computer can know what color it is
+            grid[grid==1] = self.active_piece.color_value
+            # transform the grid into a list of int
+            grid = grid.astype(int).tolist()
+            self.client.send_request({"type": "TRANSFER", "name": "GRID", "args": grid})
+
+            self.client.send_request({"type": "TRANSFER", "name": "SCORE", "args": self.score})
+
+            self.client.send_request({"type": "TRANSFER", "name": "NEXT_COLOR", "args": self.next_color})
 
     def render(self):
         # we fill the entire screen with black so we can recreate the whole ui
         self.screen.fill(self.config.data["bg_color"])
 
-        self.game_ui["my_game"].render(self.grid, self.score, self.next_color,
+        self.game_ui["you"].render(self.grid, self.score, self.next_color,
                                        active_color=self.active_piece.color_value)
 
         # when we have all the informations about the opponent we can display its data
@@ -432,8 +443,7 @@ class Game:
                 if 'NEXT_COLOR' in self.client.responses and self.client.responses['NEXT_COLOR'] is not None:
                     next_color = self.client.responses["NEXT_COLOR"]
 
-                    print(self.client.responses)
-                    self.game_ui["opponent_game"].render(grid, score, next_color)
+                    self.game_ui["opponent"].render(grid, score, next_color)
 
 
     def update(self):
