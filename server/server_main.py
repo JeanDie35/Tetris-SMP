@@ -22,11 +22,14 @@ class Server:
         self.blocks = [self.get_random_number()]
 
         self.in_game = False
-        self.nb_online_players = 0
+        self.nb_players = 0
 
 
     def get_ip_address(self) -> str:
         return socket.gethostbyname(socket.gethostname())
+
+    def get_nb_players(self) -> int:
+        return len([client for client in self.clients if self.clients[client]["in_game"]])
 
     def send_response(self, key, response: dict):
 
@@ -35,6 +38,8 @@ class Server:
         data = encode(response)
         # transform the reseponse size in four bytes
         size = len(data).to_bytes(config.data["header_size"], byteorder="big")
+
+        print(key)
 
         # sending messages with the size of the data in front
         self.clients[key]["socket"].sendall(size + data)
@@ -55,13 +60,14 @@ class Server:
         self.send_response(client_key, {"name": "CLOSED", "args": None})
 
     def start_game(self):
-        for client in self.clients:
-            # checks if the client is online
-            if self.clients[client]["online"]:
-                self.send_response(client, {"name": "GAME_STARTED", "args": None})
-                self.clients[client]["in_game"] = True
+        if not self.in_game:
+            for client in self.clients:
+                # checks if the client is online
+                if self.clients[client]["online"]:
+                    self.send_response(client, {"name": "GAME_STARTED", "args": None})
+                    self.clients[client]["in_game"] = True
 
-        self.nb_online_players = len([client for client in self.clients if self.clients[client]["online"]])
+        self.nb_players = self.get_nb_players()
         self.in_game = True
 
     def end_game(self, key: str):
@@ -75,7 +81,6 @@ class Server:
 
             else:
                 self.in_game = False
-
 
 
     def get_key(self, client_socket: socket.socket) -> str | None:
@@ -152,7 +157,7 @@ class Server:
                             self.next_block(key)
 
                         elif request["name"] == "NB_PLAYERS":
-                            self.send_response(key, {"name": "NB_PLAYERS", "args": self.nb_online_players})
+                            self.send_response(key, {"name": "NB_PLAYERS", "args": self.nb_players})
 
 
             finally:
@@ -205,14 +210,11 @@ class Server:
     def send_data(self, key, data_name, data):
 
         # get the opponent's key
-        opponent = None
-        for client in self.clients:
-            if client != key:
-               opponent = client
+        # the opponent must be in game
+        opponent = [client for client in self.clients if client != key and self.clients[client]["in_game"]]
 
-
-        # send the opponent's grid
-        self.send_response(opponent, {"name": data_name.upper(), "args": data})
+        if opponent != []:
+            self.send_response(opponent[0], {"name": data_name.upper(), "args": data})
 
 
 

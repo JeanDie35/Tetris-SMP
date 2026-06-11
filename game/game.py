@@ -242,9 +242,9 @@ class Game:
         self.active_piece = ActivePiece(self, self.config, self.client.get_color())
         self.insert_blocks()
 
-        self.next_color = int(self.client.get_color())
+        self.next_color = self.client.get_color()
 
-        self.nb_players = int(self.client.get_nb_players())
+        self.nb_players = self.client.get_nb_players()
 
         # if there's only 2 players playing
         if self.nb_players == 2:
@@ -262,6 +262,7 @@ class Game:
         # if there's grid put block where the blocks must generate
         for color_value in range(self.config.data["first_fixed_block"], self.config.data["last_fixed_block"] + 1):
             if color_value in self.grid[self.active_piece.pos[0]:y, self.active_piece.pos[1]:x]:
+                print("Game over 1")
                 self.over = True
         self.grid[self.active_piece.pos[0]:y, self.active_piece.pos[1]:x] = self.active_piece.array
 
@@ -301,8 +302,16 @@ class Game:
 
         if event.type == pygame.KEYDOWN:
 
-            if event.key == pygame.K_F6:
+            # cheats
+            if event.key == pygame.K_c:
                 self.move_line_down(self.grid.shape[0] - 1)
+
+            if event.key == pygame.K_w:
+                self.arr_size = (self.playing_screen_size[1] // BLOCK_SIZE, self.playing_screen_size[0] // BLOCK_SIZE)
+                self.grid = np.zeros(self.arr_size)
+
+                self.active_piece = ActivePiece(self, self.config, self.client.get_color())
+                self.insert_blocks()
 
             if event.key == self.key_binds["turn right"] or event.key == self.key_binds["turn left"]:
 
@@ -407,12 +416,13 @@ class Game:
         self.active_piece = ActivePiece(self, self.config, self.next_color)
 
         self.insert_blocks()
-        self.next_color = int(self.client.get_color())
+        self.next_color = self.client.get_color()
 
     def send_data(self):
         """""
         sends the grid and the score to the server
         """""
+
         # we don't send the grid if there's more than 2 players online or less because we can't display three grids
         if self.nb_players == 2:
             grid = self.grid.copy()
@@ -457,4 +467,5 @@ class Game:
         self.render()
 
         if self.over:
+            print("Game over 2")
             return "game_over"

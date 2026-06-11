@@ -67,6 +67,7 @@ else:
             screen.fill(BG_COLOR)
 
             if next_frame == game_over and active_frame == game:
+                print("Game Over 3")
                 # sends a request to the server saying that the game is over
                 client.send_request({"type": "EVENT", "name": "OVER", "args": None})
 
