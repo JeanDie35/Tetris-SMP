@@ -51,8 +51,19 @@
             200,
             200,
             200
+        ],
+        "dark_grey": [
+            48,
+            48,
+            48
         ]
     },
+    "game_modes": [
+        "First to 100",
+        "First to 200",
+        "First to 300",
+        "No line broken"
+    ],
     "port": 8000,
     "server_ip": "192.168.1.23",
     "header_size": 4

@@ -13,7 +13,6 @@ class Client:
         self.server_ip = self.config.data["server_ip"]  # replace with the server's IP address
         self.server_port = self.config.data["port"]  # replace with the server's port number
         self.key = key
-        self.game_started = False
 
         # dict to store the server's responses depending on the name of the response
         self.responses = {}
@@ -33,8 +32,8 @@ class Client:
             if response == 'Client already connected':
                 raise Exception("Client already connected")
 
-            elif response == 'Game is already started':
-                raise Exception("Game is already started")
+            elif response == 'Game has already started':
+                raise Exception("Game has already started")
 
             else:
                 self.key = response
@@ -71,11 +70,7 @@ class Client:
 
             print(f"Received : {response}")
 
-            if response["name"] == "GAME_STARTED":
-                # will tell the game to start
-                self.game_started = True
-
-            elif response["name"] == "CLOSED":
+            if response["name"] == "CLOSED":
                 self.close_conn()
                 break
 
@@ -103,6 +98,7 @@ class Client:
         # waits for the server to answer
         while not "NEXT_BLOCK" in self.responses or self.responses["NEXT_BLOCK"] is None :
             pass
+        print(self.responses)
         return self.responses["NEXT_BLOCK"]
 
     def get_nb_players(self):

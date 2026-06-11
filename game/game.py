@@ -1,6 +1,5 @@
 import numpy as np
 import pygame
-import time
 
 from config import Config
 
@@ -226,7 +225,11 @@ class Game:
         # var stores the normal speed, when k up isn't pressed
         self.base_speed = self.config.data["base_speed"]
 
+        self.game_mode = None
+
         self.over = False
+        # stores if the player stops the game because he won or he lost
+        self.status = None
 
         self.counter = 0
 
@@ -235,9 +238,29 @@ class Game:
     def set_screen_size(self, size):
         self.screen = pygame.display.set_mode(size)
 
+    def increase_score(self, score):
+        self.score += score
+
+        # I will have to change that
+        if ((self.game_mode == "First to 100" and self.score >= 100) or
+                (self.game_mode == "First to 200" and self.score >= 200) or (self.game_mode == "First to 300" and self.score >= 300)):
+            self.win()
+
+    def lose(self):
+        self.over = True
+        self.status = "LOST"
+
+    def win(self):
+        self.over = True
+        self.status = "WON"
+
     def start_game(self, client):
         # when starting the game, we need a client to communicate with the server
         self.client = client
+        self.game_mode = self.client.responses["GAME_STARTED"]
+        # resets the var
+        self.client.responses["GAME_STARTED"] = None
+        print(f"Starting game with mode {self.game_mode}")
 
         self.active_piece = ActivePiece(self, self.config, self.client.get_color())
         self.insert_blocks()
@@ -263,7 +286,7 @@ class Game:
         for color_value in range(self.config.data["first_fixed_block"], self.config.data["last_fixed_block"] + 1):
             if color_value in self.grid[self.active_piece.pos[0]:y, self.active_piece.pos[1]:x]:
                 print("Game over 1")
-                self.over = True
+                self.lose()
         self.grid[self.active_piece.pos[0]:y, self.active_piece.pos[1]:x] = self.active_piece.array
 
     def is_fixed_block(self, coords: list | tuple) -> bool:
@@ -280,9 +303,6 @@ class Game:
         # creating the numpy array
         self.arr_size = (self.playing_screen_size[1] // BLOCK_SIZE, self.playing_screen_size[0] // BLOCK_SIZE)
         self.grid = np.zeros(self.arr_size)
-
-        self.active_piece = ActivePiece(self, self.config, self.client.get_color())
-        self.insert_blocks()
 
         # reset the screen's size
         self.set_screen_size((self.config.data["game_screen_width"], self.config.data["game_screen_height"]))
@@ -377,13 +397,18 @@ class Game:
         for i in range(self.grid.shape[0]):
 
             if not self.config.data["empty"] in self.grid[i, :] and not self.config.data["moving_block"] in self.grid[i, :]:
-                self.line_broken += 1
-                lines_in_a_row += 1
-                self.score += self.config.data["score_per_line"] * lines_in_a_row
-                self.move_line_down(i)
 
-                if self.line_broken % 10 == 0:
-                    self.base_speed += 0.5
+                if self.game_mode == "No line broken":
+                    self.lose()
+
+                else:
+                    self.line_broken += 1
+                    lines_in_a_row += 1
+                    self.increase_score(self.config.data["score_per_line"] * lines_in_a_row)
+                    self.move_line_down(i)
+
+                    if self.line_broken % 10 == 0:
+                        self.base_speed += 0.5
 
     def handle_falling(self):
         """""
@@ -401,9 +426,7 @@ class Game:
                 self.spawn_new_blocks()
                 # if the game is over, we don't add the points
                 if not self.over:
-                    self.score += self.config.data["score_per_block"]
-
-            print("grid : ", self.grid)
+                    self.increase_score(self.config.data["score_per_block"])
 
         self.counter += 1
 
@@ -425,16 +448,18 @@ class Game:
 
         # we don't send the grid if there's more than 2 players online or less because we can't display three grids
         if self.nb_players == 2:
+
             grid = self.grid.copy()
             # we transform the 1 with the active color so that the other computer can know what color it is
             grid[grid==1] = self.active_piece.color_value
             # transform the grid into a list of int
             grid = grid.astype(int).tolist()
-            self.client.send_request({"type": "TRANSFER", "name": "GRID", "args": grid})
+            self.client.send_request({"type": "TRANSFER", "name": "OPPONENT_GRID", "args": grid})
 
-            self.client.send_request({"type": "TRANSFER", "name": "SCORE", "args": self.score})
+            self.client.send_request({"type": "TRANSFER", "name": "OPPONENT_SCORE", "args": self.score})
 
-            self.client.send_request({"type": "TRANSFER", "name": "NEXT_COLOR", "args": self.next_color})
+            self.client.send_request({"type": "TRANSFER", "name": "OPPONENT_NEXT_COLOR", "args": self.next_color})
+
 
     def render(self):
         # we fill the entire screen with black so we can recreate the whole ui
@@ -444,16 +469,22 @@ class Game:
                                        active_color=self.active_piece.color_value)
 
         # when we have all the informations about the opponent we can display its data
-        if 'GRID' in self.client.responses and self.client.responses['GRID'] is not None:
-            grid = np.array(self.client.responses["GRID"])
+        if 'OPPONENT_GRID' in self.client.responses and self.client.responses['OPPONENT_GRID'] is not None:
+            grid = np.array(self.client.responses["OPPONENT_GRID"])
 
-            if 'SCORE' in self.client.responses and self.client.responses['SCORE'] is not None:
-                score = self.client.responses["SCORE"]
+            if 'OPPONENT_SCORE' in self.client.responses and self.client.responses['OPPONENT_SCORE'] is not None:
+                score = self.client.responses["OPPONENT_SCORE"]
 
-                if 'NEXT_COLOR' in self.client.responses and self.client.responses['NEXT_COLOR'] is not None:
-                    next_color = self.client.responses["NEXT_COLOR"]
+                if 'OPPONENT_NEXT_COLOR' in self.client.responses and self.client.responses['OPPONENT_NEXT_COLOR'] is not None:
+                    next_color = self.client.responses["OPPONENT_NEXT_COLOR"]
 
                     self.game_ui["opponent"].render(grid, score, next_color)
+
+    def check_game_over(self):
+        # when a player won or lost
+        if "GAME_OVER" in self.client.responses:
+            # we don't use win or lost because the player did neither of those, the game was stopped by another player
+            self.over = True
 
 
     def update(self):
@@ -465,6 +496,8 @@ class Game:
         self.send_data()
 
         self.render()
+
+        self.check_game_over()
 
         if self.over:
             print("Game over 2")

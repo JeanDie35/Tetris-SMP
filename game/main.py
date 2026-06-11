@@ -44,7 +44,7 @@ else:
     welcome = Welcome(screen, config, client)
     game = Game(screen, config)
     settings = Settings(screen, config)
-    game_over = GameOver(screen, config)
+    game_over = GameOver(screen, config, client)
 
     active_frame = welcome
     next_frame = None
@@ -68,9 +68,13 @@ else:
 
             if next_frame == game_over and active_frame == game:
                 print("Game Over 3")
-                # sends a request to the server saying that the game is over
-                client.send_request({"type": "EVENT", "name": "OVER", "args": None})
 
+                if game.status is not None:
+                    # sends a request to the server saying that the game is over
+                    client.send_request({"type": "EVENT", "name": "GAME_OVER", "args": {"status" : game.status}})
+
+                # when the game is over and the server needs the score
+                client.send_request({"type": "POST", "name": "SCORE", "args": game.score})
                 game_over.score = game.score
                 game.reset()
 

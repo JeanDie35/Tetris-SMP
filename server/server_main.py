@@ -2,7 +2,6 @@ import socket
 import threading
 import random
 import secrets
-from builtins import print
 
 from config import Config
 from tools import decode, encode, recv_nb_bytes
@@ -23,6 +22,7 @@ class Server:
 
         self.in_game = False
         self.nb_players = 0
+        self.scores = []
 
 
     def get_ip_address(self) -> str:
@@ -31,7 +31,7 @@ class Server:
     def get_nb_players(self) -> int:
         return len([client for client in self.clients if self.clients[client]["in_game"]])
 
-    def send_response(self, key, response: dict):
+    def send_message(self, key, response: dict):
 
         print(f"Sent : {response}")
 
@@ -39,7 +39,6 @@ class Server:
         # transform the reseponse size in four bytes
         size = len(data).to_bytes(config.data["header_size"], byteorder="big")
 
-        print(key)
 
         # sending messages with the size of the data in front
         self.clients[key]["socket"].sendall(size + data)
@@ -55,21 +54,23 @@ class Server:
 
     def close_conn_with(self, client_key: str):
         self.end_game(client_key)
-
+        self.clients[client_key]["online"] = False
         print(f"Closing connection with client : {client_key}")
-        self.send_response(client_key, {"name": "CLOSED", "args": None})
+        self.send_message(client_key, {"name": "CLOSED", "args": None})
 
-    def start_game(self):
+    def start_game(self, mode):
         if not self.in_game:
             for client in self.clients:
+
                 # checks if the client is online
                 if self.clients[client]["online"]:
-                    self.send_response(client, {"name": "GAME_STARTED", "args": None})
+                    self.send_message(client, {"name": "GAME_STARTED", "args": mode})
                     self.clients[client]["in_game"] = True
 
         self.nb_players = self.get_nb_players()
         self.in_game = True
 
+    # ends the game for one player
     def end_game(self, key: str):
         self.clients[key]["in_game"] = False
 
@@ -81,6 +82,43 @@ class Server:
 
             else:
                 self.in_game = False
+
+    def game_over(self, originator_key: str, status: str):
+        """""
+        originator_key : key of the client who sent the GAME_OVER message
+        status : if the originator won or lost
+        """""
+
+        # telling the clients that the game is over and getting the score of every player
+        for client in self.clients:
+            if self.clients[client]["in_game"]:
+                self.send_message(client, {"name": "GAME_OVER", "args": None})
+
+        self.nb_players = self.get_nb_players()
+        # waiting for the clients to answer
+        while len(self.scores) < self.nb_players:
+            pass
+        self.scores = sorted(self.scores, key=lambda x: x["score"], reverse=True)
+
+        # we remove the originator
+        for score in self.scores:
+            if score.keys[0] == originator_key:
+                originator_score = score["score"]
+                break
+
+        # if he lost, he is last one
+        if status == "LOST":
+            self.scores.append({originator_key: originator_score})
+
+        # if he won he is first one
+        elif status == "WON":
+            self.scores.insert(0, {originator_key: originator_score})
+
+        # send the results to the client and end the game
+        for client in self.clients:
+            if self.clients[client]["in_game"]:
+                self.send_message(client, {"name": "RESULTS", "args": self.scores})
+                self.end_game(client)
 
 
     def get_key(self, client_socket: socket.socket) -> str | None:
@@ -104,7 +142,7 @@ class Server:
                     self.clients[client_key] = {"online": True, "socket": client_socket, "in_game": False, "block": 0}
 
             else:
-                raise Exception("Game is already started")
+                raise Exception("Game has already started")
 
         # handles exceptions
         except Exception as e:
@@ -141,10 +179,10 @@ class Server:
                             break
 
                         elif request["name"] == "START":
-                            self.start_game()
+                            self.start_game(request["args"]["mode"])
 
-                        elif request["name"] == "OVER":
-                            self.end_game(key)
+                        elif request["name"] == "GAME_OVER":
+                            self.game_over(key, request["args"]["status"])
 
                     # if the user wants to transfer data to the other players
                     elif request["type"] == "TRANSFER":
@@ -157,8 +195,13 @@ class Server:
                             self.next_block(key)
 
                         elif request["name"] == "NB_PLAYERS":
-                            self.send_response(key, {"name": "NB_PLAYERS", "args": self.nb_players})
+                            self.nb_players = self.get_nb_players()
+                            self.send_message(key, {"name": "NB_PLAYERS", "args": self.nb_players})
 
+                    elif request["type"] == "POST":
+
+                        if request["name"] == "SCORE":
+                            self.scores.append({key: request['args']})
 
             finally:
                 self.clients[key]["online"] = False
@@ -205,7 +248,7 @@ class Server:
 
         # sends the new number to the client
         block = self.blocks[self.clients[key]["block"]]
-        self.send_response(key, {"name": "NEXT_BLOCK", "args": block})
+        self.send_message(key, {"name": "NEXT_BLOCK", "args": block})
 
     def send_data(self, key, data_name, data):
 
@@ -214,7 +257,7 @@ class Server:
         opponent = [client for client in self.clients if client != key and self.clients[client]["in_game"]]
 
         if opponent != []:
-            self.send_response(opponent[0], {"name": data_name.upper(), "args": data})
+            self.send_message(opponent[0], {"name": data_name.upper(), "args": data})
 
 
 

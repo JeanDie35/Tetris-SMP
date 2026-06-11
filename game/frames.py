@@ -1,4 +1,7 @@
 import pygame
+
+from config import Config
+
 pygame.init()
 
 # all the keys that can't work with chr() or ord() function but we still want to be able to bind them
@@ -46,25 +49,31 @@ class Welcome(Frame):
         # creating grid var for the buttons' rect because it'll be needed when cheking if the mouse is on the button
         self.play_rect = assets["play"].get_rect()
         self.play_rect.x, self.play_rect.y = (self.screen.get_width() // 2 - assets["play"].get_width() // 2,
-                                              3 * self.screen.get_height() // 4 - assets["play"].get_width() // 4)
+                                              3 * self.screen.get_height() // 4 - assets["play"].get_width() // 2)
 
         self.settings_rect = assets["settings"].get_rect()
         self.settings_rect.x, self.settings_rect.y = (0, 0)
 
+        self.mode_selector = Selector(self.screen, self.config, (200, 50), self.config.data['game_modes'],
+                                      (self.screen.get_width() // 2, 5 * self.screen.get_height() // 6), "center")
+
     def update(self):
         self.screen.blit(assets["logo"], (self.screen.get_width() // 2 - assets["logo"].get_width() // 2,
-                                               self.screen.get_height() // 4 - assets["logo"].get_width() // 4))
+                                               self.screen.get_height() // 4 - assets["logo"].get_width() // 2))
 
         self.screen.blit(assets["play"], self.play_rect)
 
         self.screen.blit(assets["settings"], self.settings_rect)
 
+        self.mode_selector.render()
+
         # when the client has reveived the message from the server that the game is starting, we start the game
-        if self.client.game_started:
-            self.client.game_started = False
+        if "GAME_STARTED" in self.client.responses and self.client.responses["GAME_STARTED"] is not None:
             return "game"
 
     def handle_events(self, event: pygame.event.Event) -> str | None:
+        self.mode_selector.handle_events(event)
+
         if event.type == pygame.MOUSEBUTTONDOWN:
 
             if self.settings_rect.collidepoint(event.pos):
@@ -72,7 +81,7 @@ class Welcome(Frame):
 
             elif self.play_rect.collidepoint(event.pos):
                 # if the user tries to start the game, we don't change the active frame, but we send a request to the server
-                self.client.send_request({"type": "EVENT", "name": "START", "args": None})
+                self.client.send_request({"type": "EVENT", "name": "START", "args": {"mode" : self.mode_selector.get_selected_text()}})
 
         return None
 
@@ -140,8 +149,9 @@ class Settings(Frame):
 # frame when the game is over
 class GameOver(Frame):
 
-    def __init__(self, screen: pygame.surface.Surface, config):
+    def __init__(self, screen: pygame.surface.Surface, config, client):
         super().__init__(screen, config)
+        self.client = client
         self.score = 0
 
         # creating a var for the buttons' rect because it'll be needed when cheking if the mouse is on the button
@@ -176,6 +186,40 @@ class GameOver(Frame):
 
         return None
 
+
+class Selector:
+
+    def __init__(self, screen: pygame.surface.Surface, config: Config, size: tuple, iter: list, pos: tuple, side:str="topleft"):
+        self.screen = screen
+        self.config = config
+        self.font = pygame.font.SysFont(self.config.data["font_name"], self.config.data["font_size"])
+
+        self.rect = pygame.rect.Rect(pos, size)
+        setattr(self.rect, side, pos)
+        self.list = iter
+        self.counter = 0
+
+    def next_text(self):
+        self.counter += 1
+        if self.counter >= len(self.list):
+            self.counter = 0
+
+    def get_selected_text(self) -> str:
+        return self.list[self.counter]
+
+    def render(self):
+
+        pygame.draw.rect(self.screen, self.config.data["colors"]["dark_grey"], self.rect)
+
+        text = self.font.render(self.list[self.counter], 1, self.config.data["colors"]["white"])
+        self.screen.blit(text, (self.rect.x + self.rect.w // 2 - text.get_width() // 2,
+                                    self.rect.y + self.rect.h // 2 - text.get_height() // 2))
+
+    def handle_events(self, event: pygame.event.Event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+
+            if self.rect.collidepoint(event.pos):
+                self.next_text()
 
 class KeySelector:
 
